@@ -9,12 +9,10 @@ hostname=$(hostname)
 case $hostname in
   *grace*)
     IMAGE_PATH="/vast/palmer/apps/services/ood/grace/var_www_ood_apps/singularity";;
-  *farnam*)
-    IMAGE_PATH="/gpfs/ysm/apps/services/ood/var_www_ood_apps/singularity";;
   *mccleary*)
     IMAGE_PATH="/vast/palmer/apps/services/ood/mccleary/var_www_ood_apps/singularity";;
-  *ruddle*)
-    IMAGE_PATH="/vast/palmer/apps/services/ood/ruddle/var_www_ood_apps/singularity";;
+  *misha*)
+    IMAGE_PATH="/gpfs/radev/apps/services/ood/share/singularity";;
   *milgram*)
     IMAGE_PATH="/gpfs/milgram/apps/services/ood/var_www_ood_apps/singularity";;
   *)
@@ -24,12 +22,29 @@ esac
 # clean up old local rstudio session files
 rm -rf $HOME/ondemand/data/sys/dashboard/batch_connect/sys/ycrc_rstudio_server/output/*/rstudio/*
 
-module load <%= context.r_version %>
+# check if it is an R conda environment 
+r_module=<%= context.r_version %>
+if [[ $r_module == "__conda__:"* ]]; then 
+  module load miniconda
+  conda activate $(echo $r_module|cut -d: -f2)
+  export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${CONDA_PREFIX}/lib/R/lib
+else
+
+  module load <%= context.r_version %>
+  if [ "x${R_LIBS_USER}" == "x" ]; then
+    # if $R_LIBS_USER is not set, point it to $HOME/project/R/${R_VERSION}
+    R_VERSION=$(R --version|grep -oP  '(?<=R version )\d.\d+')
+    echo $R_VERSION
+    R_LIBS_USER=$HOME/project/R/${R_VERSION}
+    export R_LIBS_USER
+    [ ! -d ${R_LIBS_USER} ] && mkdir -p ${R_LIBS_USER}
+  fi
+
+fi
 which R
 export APPTAINERENV_R_HOME=$(which R)
-#export APPTAINERENV_R_HOME="$APPTAINERENV_R_HOME --no-save --no-init-file --no-restore"
 
-RSTUDIO_IMG=${IMAGE_PATH}/rserver-eb-rh8-06122023.sif
+RSTUDIO_IMG="${IMAGE_PATH}/rserver-2024.04.0-01082024.sif"
 
 # if the parititon is 'legacy', then use the rh7 image
 <% if context.partitions == 'legacy' %>
@@ -37,15 +52,6 @@ RSTUDIO_IMG=${IMAGE_PATH}/rserver-eb-06122023.sif
 <% end %>
 
 echo $RSTUDIO_IMG
-
-if [ "x${R_LIBS_USER}" == "x" ]; then
-  # if $R_LIBS_USER is not set, point it to $HOME/project/R/${R_VERSION}
-  R_VERSION=$(R --version|grep -oP  '(?<=R version )\d.\d+')
-  echo $R_VERSION
-  R_LIBS_USER=$HOME/project/R/${R_VERSION}
-  export R_LIBS_USER
-  [ ! -d ${R_LIBS_USER} ] && mkdir -p ${R_LIBS_USER}
-fi
 
 #
 # Start RStudio Server

@@ -38,94 +38,12 @@ function toggle_jupyterlab_switch_visibility() {
 }
 
 /**
- * Toggle the visibility of the gpu_type and gpu_devel_type selects
- */
-function toggle_gpu_type_visibility() {
-  // return if no partitions
-  if ( ! ($('#batch_connect_session_context_partitions').length > 0) ) {
-    return;
-  }
-
-  let partition_input = $('#batch_connect_session_context_partitions');
-  let gpu_type_input = $('#batch_connect_session_context_gpu_type');
-  let gpu_devel_type_input = $('#batch_connect_session_context_gpu_devel_type');
-
-  if ( gpu_devel_type_input.length > 0 ) {
-    if ( partition_input[0].value === "gpu_devel" ){
-      toggle_visibility_of_form_group(gpu_devel_type_input, 1);
-    }else{
-      toggle_visibility_of_form_group(gpu_devel_type_input, 0);
-      gpu_devel_type_input.val('');
-    }
-  }
- 
-  if ( gpu_type_input.length > 0 ) {
-    if ( partition_input[0].value === "gpu" ){
-      toggle_visibility_of_form_group(gpu_type_input, 1);
-    }else{
-      toggle_visibility_of_form_group(gpu_type_input, 0);
-      gpu_type_input.val('');
-    }
-  }
-
-	/*
-	*/
-
-
-	/*
-  if ( partition_input[0].value === "gpu_devel" ){
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_devel_type', 1
-    );
-  }else{
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_devel_type', 0
-    );
-  }
-  if ( partition_input[0].value === "gpu" ){
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_type', 1
-    );
-  }else{
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_type', 0
-    );
-  }
-  if ( partition_input[0].value.match("gpu_devel") != null ){
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_devel_type', 1
-    );
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_type', 0
-    );
-  }else if ( partition_input[0].value.match("gpu") != null ){
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_devel_type', 0
-    );
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_type', 1
-    );
-  }
-  else{
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_devel_type', 0
-    );
-    toggle_visibility_of_form_group(
-      '#batch_connect_session_context_gpu_type', 0
-    );
-  }
-  */
-}
-/**
  * Toggle the visibility of the num_gpu select
  * 
- * Looking for the value of data-has-gpu from partition to toggle on/off num_gpu
+ * Looking for the value of data-has-gpu from partition
  */
 function toggle_num_gpu_visibility() {
-  // return if no partitions
-  if ( ! ($('#batch_connect_session_context_partitions').length > 0) ) {
-    return;
-  }
+
   // return if no num_gpu
   if ( ! ($('#batch_connect_session_context_num_gpu').length > 0) ) {
     return;
@@ -133,10 +51,9 @@ function toggle_num_gpu_visibility() {
   let partition_input = $('#batch_connect_session_context_partitions');
   let num_gpu_input = $('#batch_connect_session_context_num_gpu');
 
-
   if ( partition_input[0].value.match("gpu") != null ){
     num_gpu_input.attr('min', 1);
-    num_gpu_input.val('1');
+    num_gpu_input.val(1);
   }
   else{
     num_gpu_input.attr('min', 0);
@@ -257,7 +174,6 @@ function custom_environment_change_handler() {
 
 function partition_change_handler() {
   toggle_num_gpu_visibility();
-  toggle_gpu_type_visibility();
   fix_num_hours();
 }
 
@@ -273,7 +189,6 @@ function advanced_options_handler() {
 // Set controls to align with the values of the last session context
 toggle_jupyterlab_switch_visibility();
 toggle_num_gpu_visibility();
-toggle_gpu_type_visibility();
 fix_num_hours();
 toggle_advanced_options_visibility();
 
