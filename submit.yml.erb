@@ -1,7 +1,7 @@
 <%- 
 if ! advanced_job_options.blank? then
 
-  require "/share/support/public/ood/ruby/hostspecs.rb"
+  require "/opt/ood/lib/hostspecs.rb"
   host_specs = getHostSpecs()
   libpath = host_specs[:libpath]
   require libpath+"/process_advanced_options.rb"
@@ -11,7 +11,7 @@ end
 -%>
 ---
 batch_connect:
-  template: vnc
+  template: "basic"
 script:
   native: [ "--cpus-per-task",   "<%= bc_num_cores.to_i %>",
             "--mem-per-cpu",     "<%= bc_amt_mem.to_i %>G" , 
