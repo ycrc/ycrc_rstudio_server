@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 
+<%-
+  session_dir = session.staged_root
+%>
+
 # 06/08/2022 now we need to load StdEnv since it is no longer provided for interactive session
 #            to prevent 'scp' or 'rsync get bogged down with tons of modules loaded
 module load StdEnv
 
-# get the path of the rstudio server image  based on the hostname
-hostname=$(hostname)
-case $hostname in
-  *grace*)
-    IMAGE_PATH="/vast/palmer/apps/services/ood/grace/var_www_ood_apps/singularity";;
-  *mccleary*)
-    IMAGE_PATH="/vast/palmer/apps/services/ood/mccleary/var_www_ood_apps/singularity";;
-  *misha*)
-    IMAGE_PATH="/gpfs/radev/apps/services/ood/share/singularity";;
-  *milgram*)
-    IMAGE_PATH="/gpfs/milgram/apps/services/ood/var_www_ood_apps/singularity";;
-  *)
-    IMAGE_PATH="";;
-esac
+# Set the working directory to the staged_root for OOD
+export WORKING_DIR="<%= session_dir %>"
+
+# Get the path of the RStudio Server image from the module
+
+module load <%= context.rstudio_server_version %>
+export IMAGE_PATH="${EBROOTRSTUDIOMINSERVER}"
 
 # clean up old local rstudio session files
 rm -rf $HOME/ondemand/data/sys/dashboard/batch_connect/sys/ycrc_rstudio_server/output/*/rstudio/*
@@ -29,7 +26,6 @@ if [[ $r_module == "__conda__:"* ]]; then
   conda activate $(echo $r_module|cut -d: -f2)
   export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${CONDA_PREFIX}/lib/R/lib
 else
-
   module load <%= context.r_version %>
   if [ "x${R_LIBS_USER}" == "x" ]; then
     # if $R_LIBS_USER is not set, point it to $HOME/project/R/${R_VERSION}
@@ -44,36 +40,31 @@ fi
 which R
 export APPTAINERENV_R_HOME=$(which R)
 
-RSTUDIO_IMG="${IMAGE_PATH}/rserver-2024.04.0-01082024.sif"
-
-# if the parititon is 'legacy', then use the rh7 image
-<% if context.partitions == 'legacy' %>
-RSTUDIO_IMG=${IMAGE_PATH}/rserver-eb-06122023.sif
-<% end %>
+# Update this symbolic link to point to the latest image
+RSTUDIO_IMG="${IMAGE_PATH}/RStudio-Server.sif"
 
 echo $RSTUDIO_IMG
 
 #
 # Start RStudio Server
 #
-
 # PAM auth helper used by RStudio
-export RSTUDIO_AUTH="${PWD}/bin/auth"
+export RSTUDIO_AUTH="${WORKING_DIR}/bin/auth"
 
 # Generate an `rsession` wrapper script
-export RSESSION_WRAPPER_FILE="${PWD}/rsession.sh"
+export RSESSION_WRAPPER_FILE="${WORKING_DIR}/rsession.sh"
 (
 umask 077
 sed 's/^ \{2\}//' > "${RSESSION_WRAPPER_FILE}" << EOL
   #!/usr/bin/env bash
 
   # Log all output from this script
-  export RSESSION_LOG_FILE="${SINGULARITY_HOST_FS}${PWD}/rsession.log"
+  export RSESSION_LOG_FILE="${WORKING_DIR}/rsession.log"
   exec &>>"\${RSESSION_LOG_FILE}"
-
+  set  -x
+  
   # Launch the original command
   echo "Launching rsession..."
-  set -x
   exec rsession --r-libs-user "${R_LIBS_USER}" "\${@}"
 EOL
 )
@@ -83,15 +74,33 @@ chmod 700 "${RSESSION_WRAPPER_FILE}"
 module load <%= context.additional_modules %>
 <% end %>
 
-export RSTUDIO_HOME=$HOME/ondemand/rstudio-server
-[ ! -d $RSTUDIO_HOME ] && mkdir -p $RSTUDIO_HOME
-export APPTAINERENV_PATH=$PATH:/usr/lib/rstudio-server/bin 
-export APPTAINERENV_LD_LIBRARY_PATH=$LD_LIBRARY_PATH 
-export APPTAINERENV_R_LIBS_USER=${R_LIBS_USER} 
+export RSTUDIO_HOME=${HOME}/ondemand/rstudio-server
+[ ! -d ${RSTUDIO_HOME} ] && mkdir -p ${RSTUDIO_HOME}
+# rsession doesn't share the same env as the outside script
+export APPTAINERENV_PATH="${PATH}:/usr/lib/rstudio-server/bin" 
+export APPTAINERENV_LD_LIBRARY_PATH="${LD_LIBRARY_PATH}"
+export APPTAINERENV_TZ="US/Eastern"
+export APPTAINERENV_MODULEPATH_ROOT="${MODULEPATH_ROOT}"
+export APPTAINERENV_MODULEPATH="${MODULEPATH}"
+export APPTAINERENV_LMOD_PKG="${LMOD_PKG}"
+export APPTAINERENV_PKG_CONFIG_PATH="${PKG_CONFIG_PATH}"
+export APPTAINERENV_LIBRARY_PATH="${LIBRARY_PATH}"
+export APPTAINERENV_R_LIBS_USER="${R_LIBS_USER}"
+export APPTAINERENV_SLURM_HINT="${SLURM_HINT}"
+# For Seurat
+[ -v R_LIBS_SITE ] && export APPTAINERENV_R_LIBS_SITE="${R_LIBS_SITE}"
+[ -v R_MAKEVARS_SITE ] && export APPTAINERENV_R_MAKEVARS_SITE="${R_MAKEVARS_SITE}"
+# For reticulate
+[ -v PYTHONPATH ] && export APPTAINERENV_R_PYTHONPATH="${PYTHONPATH}"
+# For Knitro
+[ -v ZIENA_LICENSE_NETWORK_ADDR ] && export APPTAINERENV_ZIENA_LICENSE_NETWORK_ADDR="${ZIENA_LICENSE_NETWORK_ADDR}"
+[ -v KNITRODIR ] && export APPTAINERENV_KNITRODIR="${KNITRODIR}"
 
 # get the job working dir
-WORKING_DIR=$(pwd)
-export MY_RENVIRON=$WORKING_DIR/.Renviron
+export MY_RENVIRON=${WORKING_DIR}/.Renviron
+export MY_RSTUDIO_DIR=${WORKING_DIR}/rstudio
+[ ! -f {$MY_RENVIRON} ] && touch ${MY_RENVIRON}
+[ ! -d ${MY_RSTUDIO_DIR} ] && mkdir -p ${MY_RSTUDIO_DIR}
 
 # process user defined environment variables
 tmp_renviron=$HOME/ondemand/renviron
@@ -103,19 +112,6 @@ if context.user_defined_envs != ""
 end 
 %>
 
-# add additional environment variables 
-echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> $MY_RENVIRON
-echo "LIBRARY_PATH=${LIBRARY_PATH}" >> $MY_RENVIRON
-echo "CPATH=${CPATH}" >> $MY_RENVIRON
-# modules like Seurat will set R_LIBS_SITE.
-[ -v R_LIBS_SITE ] && echo "R_LIBS_SITE=${R_LIBS_SITE}" >> $MY_RENVIRON
-[ -v R_MAKEVARS_SITE ] && echo "R_MAKEVARS_SITE=${R_MAKEVARS_SITE}" >> $MY_RENVIRON
-# rticulate needs PYTHONPATH
-[ -v PYTHONPATH ] && echo "PYTHONPATH=${PYTHONPATH}" >> $MY_RENVIRON
-[ -v ZIENA_LICENSE_NETWORK_ADDR ] && echo "ZIENA_LICENSE_NETWORK_ADDR=\"license.hpc.yale.internal:8349\"" >> $MY_RENVIRON
-[ -v KNITRODIR ] && echo "KNITRODIR=$KNITRODIR" >> $MY_RENVIRON
-env|grep SLURM >> $MY_RENVIRON
-
 # append user defined renvrionment variables
 [ -f $tmp_renviron ] && cat $tmp_renviron >> $MY_RENVIRON && rm $tmp_renviron
 
@@ -126,13 +122,13 @@ cd "${HOME}"
 echo "Starting up rserver..."
 set -x
 
-apptainer exec -B $RSTUDIO_HOME:/var/lib/rstudio-server \
+apptainer exec -B ${RSTUDIO_HOME}:/var/lib/rstudio-server \
   -B /run/dbus:/run/dbus \
-  -B $WORKING_DIR/.Renviron:$HOME/.Renviron \
-  -B /vast:/vast         \
-  -B /gpfs:/gpfs         \
-<% if context.saved_r == "0" %>  -B $WORKING_DIR/rstudio:$HOME/.local/share/rstudio \
-  -B $WORKING_DIR/.Rhistory:$HOME/.Rhistory \
+  -B ${MY_ENVIRON}:${HOME}/.Renviron \
+  -B /nfs:/nfs            \
+  -B /apps:/apps          \
+  <% if context.saved_r == "0" %>  -B ${MY_RSTUDIO_DIR}:${HOME}/.local/share/rstudio \
+  -B ${WORKING_DIR}/.Rhistory:$HOME/.Rhistory \
   <% end %>\
   ${RSTUDIO_IMG} rserver \
   --server-working-dir=$RSTUDIO_HOME \
@@ -141,6 +137,6 @@ apptainer exec -B $RSTUDIO_HOME:/var/lib/rstudio-server \
   --secure-cookie-key-file=$RSTUDIO_HOME/secure-cookie-key \
   --www-port ${port} \
   --auth-none 0 \
-  --auth-pam-helper-path "${SINGULARITY_HOST_FS}${RSTUDIO_AUTH}" \
+  --auth-pam-helper-path "${RSTUDIO_AUTH}" \
   --auth-encrypt-password 0 \
-  --rsession-path "${SINGULARITY_HOST_FS}${RSESSION_WRAPPER_FILE}"
+  --rsession-path "${RSESSION_WRAPPER_FILE}"
