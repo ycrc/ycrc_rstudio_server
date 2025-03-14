@@ -1,12 +1,12 @@
 <%
-app_name = "R"
+app_name = "RStudio-Server"
 app_root = "/var/www/ood/apps/modules"+"/"+app_name
 # Update Conda environments
 if not File.exist?(ENV["HOME"]+"/ondemand/conda-r-env-list.txt")
     `/share/support/public/ood/ycrc_conda_env.sh update > /dev/null 2>&1`
 end
 # get the permissible partitions
-require "/share/support/public/ood/ruby/hostspecs.rb"
+require "/opt/ood/lib/hostspecs.rb"
 host_specs = getHostSpecs()
 libpath = host_specs[:libpath]
 hostname = host_specs[:host]
@@ -17,12 +17,39 @@ partitions = processPartitions(libpath)
 ---
 cluster: <%= hostname %>
 
+form:
+  - rstudio_server_version
+  - r_version
+  - saved_r
+  - bc_vnc_idle
+  - desktop
+  - bc_num_slots
+  - bc_num_hours
+  - bc_num_cores
+  - bc_amt_mem
+  - partitions
+  - num_gpu
+  - reservation
+  - bc_email_on_started
+  - additional_modules
+  - advanced_options
+  - bc_account
+  - advanced_job_options
+  - user_defined_envs
+  
 attributes:
+  rstudio_server_version:
+    widget: "select"
+    label: RStudio Server version
+    options:
+      <% IO.foreach(app_root+"/modules") do |line| %>
+      - [ "<%= line %>" ]
+      <% end %>
   r_version:
     widget: "select"
     label: R version
     options:
-      <% IO.foreach(app_root+"/modules") do |line| %>
+      <% IO.foreach(app_root+"/../R/modules") do |line| %>
       - [ "<%= line %>" ]
       <% end %>
       <%
@@ -122,21 +149,3 @@ attributes:
           Key2=value2
           ...
 
-form:
-  - r_version
-  - saved_r
-  - bc_vnc_idle
-  - desktop
-  - bc_num_slots
-  - bc_num_hours
-  - bc_num_cores
-  - bc_amt_mem
-  - partitions
-  - num_gpu
-  - reservation
-  - bc_email_on_started
-  - additional_modules
-  - advanced_options
-  - bc_account
-  - advanced_job_options
-  - user_defined_envs
