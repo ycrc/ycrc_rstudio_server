@@ -124,7 +124,6 @@ set -x
 
 apptainer exec -B ${RSTUDIO_HOME}:/var/lib/rstudio-server \
   -B /run/dbus:/run/dbus \
-  -B ${MY_ENVIRON}:${HOME}/.Renviron \
   -B /nfs:/nfs            \
   -B /apps:/apps          \
   <% if context.saved_r == "0" %>  -B ${MY_RSTUDIO_DIR}:${HOME}/.local/share/rstudio \
