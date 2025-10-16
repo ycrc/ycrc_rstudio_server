@@ -11,6 +11,8 @@ module load StdEnv
 # Set the working directory to the staged_root for OOD
 export WORKING_DIR="<%= session_dir %>"
 
+echo -e "\nWORKING_DIR=$WORKING_DIR\n"
+
 # Get the path of the RStudio Server image from the module
 
 module load <%= context.rstudio_server_version %>
@@ -65,6 +67,11 @@ sed 's/^ \{2\}//' > "${RSESSION_WRAPPER_FILE}" << EOL
   
   # Launch the original command
   echo "Launching rsession..."
+  echo "Inside rsession script. R_LIBS_SITE: \$R_LIBS_SITE"
+
+  # If set, export R_LIBS_SITE to the session
+  ${R_LIBS_SITE:+ export R_LIBS_SITE=$R_LIBS_SITE}
+  
   exec rsession --r-libs-user "${R_LIBS_USER}" "\${@}"
 EOL
 )
@@ -88,6 +95,8 @@ export APPTAINERENV_LIBRARY_PATH="${LIBRARY_PATH}"
 export APPTAINERENV_R_LIBS_USER="${R_LIBS_USER}"
 export APPTAINERENV_SLURM_HINT="${SLURM_HINT}"
 # For Seurat
+# Note, setting R_LIBS_SITE here has no affect on the rsession. This is now handled in the session script.
+# Might be able to remove this line if that was its only purpose
 [ -v R_LIBS_SITE ] && export APPTAINERENV_R_LIBS_SITE="${R_LIBS_SITE}"
 [ -v R_MAKEVARS_SITE ] && export APPTAINERENV_R_MAKEVARS_SITE="${R_MAKEVARS_SITE}"
 # For reticulate
@@ -100,6 +109,7 @@ export APPTAINERENV_SLURM_HINT="${SLURM_HINT}"
 export MY_RENVIRON=${WORKING_DIR}/.Renviron
 export MY_RSTUDIO_DIR=${WORKING_DIR}/rstudio
 [ ! -f {$MY_RENVIRON} ] && touch ${MY_RENVIRON}
+
 [ ! -d ${MY_RSTUDIO_DIR} ] && mkdir -p ${MY_RSTUDIO_DIR}
 
 # process user defined environment variables
@@ -122,13 +132,14 @@ cd "${HOME}"
 echo "Starting up rserver..."
 set -x
 
-apptainer exec -B ${RSTUDIO_HOME}:/var/lib/rstudio-server \
+apptainer exec \
+  -B ${RSTUDIO_HOME}:/var/lib/rstudio-server \
   -B /run/dbus:/run/dbus \
   -B /nfs:/nfs            \
   -B /apps:/apps          \
   <% if context.saved_r == "0" %>  -B ${MY_RSTUDIO_DIR}:${HOME}/.local/share/rstudio \
   -B ${WORKING_DIR}/.Rhistory:$HOME/.Rhistory \
-  <% end %>\
+  <% end %> \
   ${RSTUDIO_IMG} rserver \
   --server-working-dir=$RSTUDIO_HOME \
   --server-pid-file=$RSTUDIO_HOME/rstudio-server.pid \
@@ -138,4 +149,5 @@ apptainer exec -B ${RSTUDIO_HOME}:/var/lib/rstudio-server \
   --auth-none 0 \
   --auth-pam-helper-path "${RSTUDIO_AUTH}" \
   --auth-encrypt-password 0 \
-  --rsession-path "${RSESSION_WRAPPER_FILE}"
+  --rsession-path "${RSESSION_WRAPPER_FILE}" 
+
