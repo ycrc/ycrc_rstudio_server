@@ -3,7 +3,7 @@ app_name = "RStudio-Server"
 app_root = "/var/www/ood/apps/modules"+"/"+app_name
 # Update Conda environments
 if not File.exist?(ENV["HOME"]+"/ondemand/conda-r-env-list.txt")
-    `/share/support/public/ood/ycrc_conda_env.sh update > /dev/null 2>&1`
+    `/apps/bin/ycrc_conda_env.sh.old update > /dev/null 2>&1`
 end
 # get the permissible partitions
 require "/opt/ood/lib/hostspecs.rb"
@@ -53,7 +53,7 @@ attributes:
       - [ "<%= line %>" ]
       <% end %>
       <%
-      conda_envs = `/share/support/public/ood/ycrc_conda_env.sh R`.split
+      conda_envs = `/apps/bin/ycrc_conda_env.sh.old R`.split
       conda_envs.each do |conda_env|
       %>
       - [ "conda: <%= conda_env %>", "__conda__:<%= conda_env %>" ]
